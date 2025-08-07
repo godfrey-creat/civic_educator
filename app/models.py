@@ -38,7 +38,7 @@ class Message(Base):
     content = Column(Text, nullable=False)
     citations = Column(JSON)  # List of citations with title, snippet, source_link
     confidence = Column(Float)
-    metadata = Column(JSON)  # Steps, additional context
+    message_metadata = Column(JSON)  # Steps, additional context
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     conversation = relationship("Conversation", back_populates="messages")
@@ -96,7 +96,7 @@ class KnowledgeBaseChunk(Base):
     document_id = Column(UUID(as_uuid=True), ForeignKey("kb_documents.id"), nullable=False)
     content = Column(Text, nullable=False)
     chunk_index = Column(Integer, nullable=False)
-    metadata = Column(JSON)  # Additional chunk metadata
+    meta = Column(JSON)  # Additional chunk metadata
     embedding = Column(JSON)  # Vector embedding as list
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -121,3 +121,62 @@ class Feedback(Base):
     is_helpful = Column(Boolean, nullable=False)
     comment = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(255), nullable=False)
+    full_name = Column(String(255))
+    is_active = Column(Boolean, default=True)
+    is_superuser = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class Course(Base):
+    __tablename__ = "courses"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String(255), nullable=False)
+    description = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    lessons = relationship("Lesson", back_populates="course", cascade="all, delete-orphan")
+
+class Lesson(Base):
+    __tablename__ = "lessons"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    course_id = Column(UUID(as_uuid=True), ForeignKey("courses.id"), nullable=False)
+    title = Column(String(255), nullable=False)
+    content = Column(Text)
+    order = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    course = relationship("Course", back_populates="lessons")
+    quizzes = relationship("Quiz", back_populates="lesson", cascade="all, delete-orphan")
+
+class Quiz(Base):
+    __tablename__ = "quizzes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    lesson_id = Column(UUID(as_uuid=True), ForeignKey("lessons.id"), nullable=False)
+    question = Column(Text, nullable=False)
+    answer = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    lesson = relationship("Lesson", back_populates="quizzes")
+
+class Progress(Base):
+    __tablename__ = "progress"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    lesson_id = Column(UUID(as_uuid=True), ForeignKey("lessons.id"), nullable=False)
+    completed = Column(Boolean, default=False)
+    completed_at = Column(DateTime(timezone=True))
+
+    # Optionally, add relationships if needed:
+    # user = relationship("User")
+    # lesson = relationship("Lesson")

@@ -65,7 +65,7 @@ class IncidentRequest(BaseModel):
     location_text: Optional[str] = Field(None, max_length=500)
     location_coords: Optional[LocationCoords] = None
     contact_email: Optional[EmailStr] = None
-    contact_phone: Optional[str] = Field(None, regex=r'^\+?[\d\s\-\(\)]{10,20}$')
+    contact_phone: Optional[str] = Field(None, pattern=r'^\+?[\d\s\-\(\)]{10,20}$')
     photo_url: Optional[str] = None
     
     @validator('category')
@@ -123,7 +123,7 @@ class IncidentDetail(BaseModel):
 class IncidentUpdateRequest(BaseModel):
     status: Optional[IncidentStatus] = None
     notes: Optional[str] = Field(None, max_length=1000)
-    priority: Optional[str] = Field(None, regex=r'^(LOW|MEDIUM|HIGH|URGENT)$')
+    priority: Optional[str] = Field(None, pattern=r'^(LOW|MEDIUM|HIGH|URGENT)$')
 
 # Knowledge Base schemas
 class KBSearchResult(BaseModel):
