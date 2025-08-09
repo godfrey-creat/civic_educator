@@ -10,6 +10,13 @@ import logging
 from datetime import datetime
 import uuid
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 # Import our modules
 from app.database import engine, Base, get_db
 from app.models import *
@@ -19,15 +26,11 @@ from app.services.incident_service import IncidentService
 from app.services.kb_service import KnowledgeBaseService
 from app.services.ai_service import AIService
 from app.config import settings
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-security = HTTPBearer(auto_error=False)
+from app.auth import router as auth_router
+from app.content import router as content_router
+# Import and alias any additional routers here
+# Example:
+# from app.some_module import router as some_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -64,6 +67,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Include routers
+app.include_router(auth_router)
+app.include_router(content_router)
+# Add more routers below as you create them, e.g.:
+# app.include_router(some_router)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -72,6 +81,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+security = HTTPBearer(auto_error=False)
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Simple authentication - extend for production"""
@@ -331,6 +342,10 @@ async def list_kb_documents(
     except Exception as e:
         logger.error(f"List KB documents error: {e}")
         raise HTTPException(status_code=500, detail="Failed to list documents")
+
+@app.get("/")
+def root():
+    return {"message": "Civic Educator API is running"}
 
 if __name__ == "__main__":
     uvicorn.run(

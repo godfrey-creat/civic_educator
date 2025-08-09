@@ -12,7 +12,7 @@ __description__ = "A platform for civic education and democratic engagement"
 # Core module imports
 from .services.notification_service import NotificationService
 from .models import User, Course, Lesson, Quiz, Progress
-from .database import DatabaseManager
+#from .database import DatabaseManager
 from .auth import AuthManager
 from .content import ContentManager
 
