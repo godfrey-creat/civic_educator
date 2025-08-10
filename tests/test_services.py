@@ -1,9 +1,14 @@
 import pytest
 import asyncio
+import os
+import sys
+from fastapi import FastAPI
 from unittest.mock import Mock, AsyncMock
 from app.services.ai_service import AIService
 from app.services.chat_service import ChatService
 from app.schemas import UserContext
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 @pytest.mark.asyncio
 async def test_ai_service_initialization():
