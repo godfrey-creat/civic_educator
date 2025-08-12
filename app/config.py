@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     MAX_SEARCH_RESULTS: int = 5
     MIN_CONFIDENCE_THRESHOLD: float = 0.6
     
+    SECRET_KEY: str
+    ACCESS_TOKEN_EXPIRE_MINUTES: int
+    
+    JWT_SECRET_KEY: str
+    JWT_ALGORITHM: str
+    JWT_EXP_MINUTES: int
+    
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30

@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError, jwt
 import logging
 from datetime import datetime
 import uuid
@@ -29,8 +30,11 @@ from app.config import settings
 from app.auth import router as auth_router
 from app.content import router as content_router
 # Import and alias any additional routers here
-# Example:
-# from app.some_module import router as some_router
+
+# Load JWT config
+SECRET_KEY = settings.JWT_SECRET_KEY
+ALGORITHM = settings.JWT_ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.JWT_EXP_MINUTES
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -76,31 +80,34 @@ app.include_router(content_router)
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=["*", "http://localhost:5173"],  # Configure appropriately for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 security = HTTPBearer(auto_error=False)
+oauth2_scheme = HTTPBearer()
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Simple authentication - extend for production"""
-    if not credentials:
-        return None
-    
-    # For demo purposes, accept any token
-    # In production, validate JWT tokens properly
-    token = credentials.credentials
-    if token.startswith("staff_"):
-        return {"user_id": token, "role": "staff"}
-    elif token.startswith("resident_"):
-        return {"user_id": token, "role": "resident"}
-    return None
+
+async def get_current_user(token: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    # Fetch user from DB if needed, but for now return payload
+    return {"email": email, "is_staff": payload.get("is_staff"), "role": "staff" if payload.get("is_staff") else "resident"}
 
 def require_staff(user=Depends(get_current_user)):
-    """Require staff authentication"""
-    if not user or user.get("role") != "staff":
+    if not user or not user.get("is_staff"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Staff access required"
