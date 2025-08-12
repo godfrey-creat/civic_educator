@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import StaffTools from "./StaffTools";
 import RoleToggle from "./RoleToggle";
 import ChatInterface from "./ChatInterface";
@@ -11,7 +11,11 @@ import { getToken, logout } from "../utils/auth";
 export default function CivicLayout() {
   const [role, setRole] = useState<"resident" | "staff">("resident");
   const [tab, setTab] = useState("chat");
-  const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(!!getToken());
+
+  useEffect(() => {
+    setIsLoggedIn(!!getToken());
+  }, []);
 
   const isResident = role === "resident";
   const tabs = isResident
@@ -28,6 +32,8 @@ export default function CivicLayout() {
   const handleLogout = () => {
     logout();
     setIsLoggedIn(false);
+    // ensure staff-only UI is hidden
+    setTab("chat");
   };
 
   return (
@@ -37,44 +43,50 @@ export default function CivicLayout() {
         <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-center sm:text-left">
           CivicNavigator
         </h1>
-        <RoleToggle role={role} onChange={setRole} />
+
+        <div className="flex items-center gap-4">
+          <RoleToggle role={role} onChange={(r) => { setRole(r); setTab("chat"); }} />
+          {isLoggedIn && (
+            <button
+              onClick={handleLogout}
+              className="px-3 py-2 text-sm bg-red-600 text-white rounded"
+            >
+              Logout
+            </button>
+          )}
+        </div>
       </header>
 
-      {/* Tabs Navigation */}
+      {/* Tabs navigation */}
       <nav className="flex flex-wrap justify-center gap-3 mb-6">
         {tabs.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
             className={`px-4 py-2 text-sm sm:text-base rounded border border-divider min-w-[120px] text-center transition-colors duration-200 ${
-              tab === key
-                ? "bg-accentCyan text-midnight font-semibold"
-                : "bg-panel hover:bg-accentCyan/10"
+              tab === key ? "bg-accentCyan text-midnight font-semibold" : "bg-panel hover:bg-accentCyan/10"
             }`}
           >
             {label}
           </button>
         ))}
 
-        {/* Only show login/register tabs if role is staff */}
+        {/* Show Login/Register tabs when staff role chosen and not logged in */}
         {!isResident && !isLoggedIn && (
           <>
             <button
               onClick={() => setTab("login")}
               className={`px-4 py-2 text-sm sm:text-base rounded border border-divider min-w-[120px] text-center transition-colors duration-200 ${
-                tab === "login"
-                  ? "bg-accentCyan text-midnight font-semibold"
-                  : "bg-panel hover:bg-accentCyan/10"
+                tab === "login" ? "bg-accentCyan text-midnight font-semibold" : "bg-panel hover:bg-accentCyan/10"
               }`}
             >
               Login
             </button>
+
             <button
               onClick={() => setTab("register")}
               className={`px-4 py-2 text-sm sm:text-base rounded border border-divider min-w-[120px] text-center transition-colors duration-200 ${
-                tab === "register"
-                  ? "bg-accentCyan text-midnight font-semibold"
-                  : "bg-panel hover:bg-accentCyan/10"
+                tab === "register" ? "bg-accentCyan text-midnight font-semibold" : "bg-panel hover:bg-accentCyan/10"
               }`}
             >
               Register
@@ -83,36 +95,24 @@ export default function CivicLayout() {
         )}
       </nav>
 
-      {/* Main Content */}
+      {/* Main content */}
       <main className="max-w-3xl mx-auto space-y-6 sm:space-y-8">
         {tab === "chat" && <ChatInterface role={role} />}
         {tab === "report" && isResident && <IncidentForm />}
         {tab === "status" && isResident && <StatusLookup />}
 
-        {/* Staff Tools (only if logged in) */}
+        {/* Staff Tools */}
         {tab === "staff-tools" && !isResident && (
           <>
             {isLoggedIn ? (
-              <>
-                <StaffTools />
-                <div className="mt-4 text-right">
-                  <button
-                    onClick={handleLogout}
-                    className="px-3 py-2 text-sm bg-red-500 text-white rounded"
-                  >
-                    Logout
-                  </button>
-                </div>
-              </>
+              <StaffTools />
             ) : (
-              <p className="text-center text-textMuted">
-                You must be logged in as staff to view this section.
-              </p>
+              <p className="text-center text-textMuted">You must be logged in as staff to view this section.</p>
             )}
           </>
         )}
 
-        {/* Login Tab */}
+        {/* Login */}
         {tab === "login" && !isLoggedIn && (
           <LoginForm
             onLogin={() => {
@@ -122,10 +122,11 @@ export default function CivicLayout() {
           />
         )}
 
-        {/* Register Tab */}
+        {/* Register */}
         {tab === "register" && !isLoggedIn && (
           <RegisterForm
             onRegister={() => {
+              // after successful registration we go to login tab
               setTab("login");
             }}
           />

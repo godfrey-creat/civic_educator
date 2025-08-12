@@ -15,6 +15,6 @@ export interface IncidentFormData {
   title: string;
   description: string;
   category: string;
-  location: string;
-  contact: string;
+  location_text?: string;
+  contact_email: string;
 }

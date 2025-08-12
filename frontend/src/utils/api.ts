@@ -1,7 +1,7 @@
 import type { IncidentFormData } from "../types";
 import { getToken } from "./auth";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5089";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 /** helper for GET */
 async function getJSON<T>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -114,18 +114,16 @@ export async function registerUser(
   full_name = "",
   is_staff = false
 ) {
-  return postJSON<{ msg: string; user_id?: string }>("/api/auth/register", {
-    email,
-    password,
-    full_name,
-    is_staff,
-  });
+  return postJSON<{ access_token?: string; token_type?: string; is_staff?: boolean }>(
+    "/api/auth/register",
+    { email, password, full_name, is_staff }
+  );
 }
 
 /** Auth: login user */
 export async function loginUser(email: string, password: string) {
-  return postJSON<{ access_token: string; token_type: string }>(
+  return postJSON<{ access_token: string; token_type: string; is_staff?: boolean }>(
     "/api/auth/login",
-    { username: email, password }
+    { email, password }
   );
 }
