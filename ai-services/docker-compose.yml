@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: civic-educator-ai
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./knowledge_base:/app/knowledge_base
+      - ./indexes:/app/indexes
+      - ./wheels:/wheels  # Mount pre-downloaded wheels into container
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=true
+      - EMBEDDING_MODEL=all-MiniLM-L6-v2
