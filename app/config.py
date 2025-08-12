@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     MAX_TOKENS: int = 500
     TEMPERATURE: float = 0.7
     
+    #auth
+    jwt_secret_key: str
+    jwt_algorithm: str
+    jwt_exp_minutes: int
+    
     # Performance
     MAX_CONCURRENT_REQUESTS: int = 10
     REQUEST_TIMEOUT: int = 30
