@@ -116,11 +116,8 @@ class Feedback(Base):
 
 class User(Base):
     __tablename__ = "users"
-<<<<<<< HEAD
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-=======
+
     id = Column(UUIDType, primary_key=True, default=uuid_default)
->>>>>>> 6e9b7e2557e0753d1a7caeffe309a05f5f14357b
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255))

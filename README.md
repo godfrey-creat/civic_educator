@@ -50,7 +50,7 @@ backend/
 
 ### 1. Clone repository
 ```bash
-git clone https://github.com/your-repo/civicnavigator.git
+git clone https://github.com/godfrey-creat/civic_educator.git
 cd civicnavigator
 ```
 
