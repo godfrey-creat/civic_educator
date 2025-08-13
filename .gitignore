@@ -7,6 +7,8 @@ __pycache__/
 *.so
 .env.example
 # Distribution / packaging
+# frontend/
+# frontend
 .Python
 build/
 develop-eggs/
