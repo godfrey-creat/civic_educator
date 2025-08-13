@@ -21,7 +21,15 @@ from app.services.kb_service import KnowledgeBaseService
 from app.services.ai_service import AIService
 from app.config import settings
 from app.auth import router as auth_router, decode_access_token
+#from app.content import ChatRequest, ChatResponse, IncidentRequest, IncidentResponse, IncidentStatusResponse, IncidentListItem, IncidentUpdateRequest
+#from app.content import IncidentResponse, ChatRequest, ChatResponse
 from app.content import router as content_router
+from app.api.routes.staff_kb import router as staff_kb
+from app.api.deps import get_current_staff_user
+# Initialize logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Import and alias any additional routers here
 # Example:
 # from app.some_module import router as some_router
@@ -51,7 +59,7 @@ app = FastAPI(
 # Routers
 app.include_router(auth_router)
 app.include_router(content_router)
-app.include_router(staff_kb.router)
+app.include_router(staff_kb)
 
 # CORS
 app.add_middleware(
@@ -169,9 +177,9 @@ async def update_incident(
         raise HTTPException(status_code=404, detail="Incident not found")
     return {"message": "Incident updated successfully"}
 
-@app.get("/")
-def root():
-    return {"message": "Civic Educator API is running"}
+# @app.get("/")
+# def root():
+#     return {"message": "Civic Educator API is running"}
 
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+# if __name__ == "__main__":
+#     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

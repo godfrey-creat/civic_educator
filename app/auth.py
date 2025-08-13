@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 from app.database import get_db
+from app.models import User
+import uuid
 
 # JWT config
 SECRET_KEY = "change_this_to_a_strong_secret"  # Change in production!
@@ -74,3 +76,12 @@ class AuthManager:
     @staticmethod
     def get_user_by_email(email: str, db: Session):
         return db.query(User).filter(User.email == email).first()
+#decode_access_token
+from jose import jwt, JWTError
+def decode_access_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
