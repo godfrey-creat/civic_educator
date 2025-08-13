@@ -118,7 +118,6 @@ class Feedback(Base):
 
 class User(Base):
     __tablename__ = "users"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     id = Column(UUIDType, primary_key=True, default=uuid_default)
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)

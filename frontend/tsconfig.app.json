@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "types": ["vitest", "vite/client"],
     "types": ["vitest", "vite/client","vitest/globals"],
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "target": "ES2022",
