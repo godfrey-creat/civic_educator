@@ -108,7 +108,7 @@ export async function getIncidentStatus(id: string) {
   }>(`/api/incidents/${id}/status`);
 }
 
-
+/** Search KB (staff‑only) */
 export async function getKbDocs(query: string) {
   return getJSON<{
     results: {
@@ -135,6 +135,14 @@ export async function getAllIncidents() {
       last_update: string;
     }[]
   >("/api/staff/incidents");
+}
+
+/** Staff: update incident status */
+export async function updateIncidentStatus(incidentId: string, status: string) {
+  return patchJSON<{ incident_id: string; status: string; last_update: string }>(
+    `/api/staff/incidents/${incidentId}`,
+    { status }
+  );
 }
 
 /** Auth: register new user */
