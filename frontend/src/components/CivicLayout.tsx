@@ -18,6 +18,11 @@ export default function CivicLayout() {
   }, []);
 
   const isResident = role === "resident";
+<<<<<<< HEAD
+=======
+
+  // Keep Staff Tools in the tab list anytime role = "staff"
+>>>>>>> 6e9b7e2557e0753d1a7caeffe309a05f5f14357b
   const tabs = isResident
     ? [
         { key: "chat", label: "Ask Services" },
@@ -32,7 +37,11 @@ export default function CivicLayout() {
   const handleLogout = () => {
     logout();
     setIsLoggedIn(false);
+<<<<<<< HEAD
     // ensure staff-only UI is hidden
+=======
+    // ensure staff-only UI is hidden and we land on a safe tab
+>>>>>>> 6e9b7e2557e0753d1a7caeffe309a05f5f14357b
     setTab("chat");
   };
 
@@ -45,8 +54,20 @@ export default function CivicLayout() {
         </h1>
 
         <div className="flex items-center gap-4">
+<<<<<<< HEAD
           <RoleToggle role={role} onChange={(r) => { setRole(r); setTab("chat"); }} />
           {isLoggedIn && (
+=======
+          <RoleToggle
+            role={role}
+            onChange={(r) => {
+              setRole(r);
+              setTab("chat");
+            }}
+          />
+          {/* Show Logout only when staff and logged in */}
+          {!isResident && isLoggedIn && (
+>>>>>>> 6e9b7e2557e0753d1a7caeffe309a05f5f14357b
             <button
               onClick={handleLogout}
               className="px-3 py-2 text-sm bg-red-600 text-white rounded"
@@ -64,7 +85,13 @@ export default function CivicLayout() {
             key={key}
             onClick={() => setTab(key)}
             className={`px-4 py-2 text-sm sm:text-base rounded border border-divider min-w-[120px] text-center transition-colors duration-200 ${
+<<<<<<< HEAD
               tab === key ? "bg-accentCyan text-midnight font-semibold" : "bg-panel hover:bg-accentCyan/10"
+=======
+              tab === key
+                ? "bg-accentCyan text-midnight font-semibold"
+                : "bg-panel hover:bg-accentCyan/10"
+>>>>>>> 6e9b7e2557e0753d1a7caeffe309a05f5f14357b
             }`}
           >
             {label}
@@ -77,7 +104,13 @@ export default function CivicLayout() {
             <button
               onClick={() => setTab("login")}
               className={`px-4 py-2 text-sm sm:text-base rounded border border-divider min-w-[120px] text-center transition-colors duration-200 ${
+<<<<<<< HEAD
                 tab === "login" ? "bg-accentCyan text-midnight font-semibold" : "bg-panel hover:bg-accentCyan/10"
+=======
+                tab === "login"
+                  ? "bg-accentCyan text-midnight font-semibold"
+                  : "bg-panel hover:bg-accentCyan/10"
+>>>>>>> 6e9b7e2557e0753d1a7caeffe309a05f5f14357b
               }`}
             >
               Login
@@ -86,7 +119,13 @@ export default function CivicLayout() {
             <button
               onClick={() => setTab("register")}
               className={`px-4 py-2 text-sm sm:text-base rounded border border-divider min-w-[120px] text-center transition-colors duration-200 ${
+<<<<<<< HEAD
                 tab === "register" ? "bg-accentCyan text-midnight font-semibold" : "bg-panel hover:bg-accentCyan/10"
+=======
+                tab === "register"
+                  ? "bg-accentCyan text-midnight font-semibold"
+                  : "bg-panel hover:bg-accentCyan/10"
+>>>>>>> 6e9b7e2557e0753d1a7caeffe309a05f5f14357b
               }`}
             >
               Register
@@ -107,7 +146,13 @@ export default function CivicLayout() {
             {isLoggedIn ? (
               <StaffTools />
             ) : (
+<<<<<<< HEAD
               <p className="text-center text-textMuted">You must be logged in as staff to view this section.</p>
+=======
+              <p className="text-center text-textMuted">
+                You must be logged in as staff to view this section.
+              </p>
+>>>>>>> 6e9b7e2557e0753d1a7caeffe309a05f5f14357b
             )}
           </>
         )}

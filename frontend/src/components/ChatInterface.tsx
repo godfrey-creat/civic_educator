@@ -53,6 +53,10 @@ export default function ChatInterface({ role }: ChatInterfaceProps) {
       <div
         className="space-y-3 mb-4 max-h-[400px] overflow-y-auto"
         aria-live="polite"
+<<<<<<< HEAD
+=======
+        aria-label="message history"
+>>>>>>> 6e9b7e2557e0753d1a7caeffe309a05f5f14357b
       >
         {messages.map((m, idx) => (
           <div

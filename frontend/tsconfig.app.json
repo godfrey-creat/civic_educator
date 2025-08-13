@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
+<<<<<<< HEAD
     "types": ["vitest", "vite/client"],
+=======
+    "types": ["vitest", "vite/client","vitest/globals"],
+>>>>>>> 6e9b7e2557e0753d1a7caeffe309a05f5f14357b
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "target": "ES2022",
     "useDefineForClassFields": true,
