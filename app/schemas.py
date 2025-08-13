@@ -62,9 +62,9 @@ class IncidentRequest(BaseModel):
     title: str = Field(..., min_length=5, max_length=200)
     description: str = Field(..., min_length=10, max_length=2000)
     category: str = Field(..., min_length=2, max_length=50)
+    contact_email: EmailStr
     location_text: Optional[str] = Field(None, max_length=500)
     location_coords: Optional[LocationCoords] = None
-    contact_email: Optional[EmailStr] = None
     contact_phone: Optional[str] = Field(None, pattern=r'^\+?[\d\s\-\(\)]{10,20}$')
     photo_url: Optional[str] = None
     
@@ -124,7 +124,20 @@ class IncidentUpdateRequest(BaseModel):
     status: Optional[IncidentStatus] = None
     notes: Optional[str] = Field(None, max_length=1000)
     priority: Optional[str] = Field(None, pattern=r'^(LOW|MEDIUM|HIGH|URGENT)$')
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str = ""
+    is_staff: bool = False  # New field
 
+# Add a response schema for login
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    is_staff: bool 
+    
+    class Config:
+        from_attributes = True
 # Knowledge Base schemas
 class KBSearchResult(BaseModel):
     doc_id: str
@@ -203,4 +216,4 @@ class ChatCompletionRequest(BaseModel):
 class ChatCompletionResponse(BaseModel):
     response: str
     model: str
-    usage: Dict[str, int]
+    usage: Dict[str, int]  

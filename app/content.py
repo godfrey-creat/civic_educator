@@ -14,7 +14,7 @@ class CourseOut(BaseModel):
     description: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 @router.get("/courses", response_model=List[CourseOut])
 def list_courses(db: Session = Depends(get_db)):
@@ -34,7 +34,7 @@ class LessonOut(BaseModel):
     order: Optional[int] = 0
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 @router.get("/courses/{course_id}/lessons", response_model=List[LessonOut])
 def list_lessons(course_id: uuid.UUID, db: Session = Depends(get_db)):
@@ -53,7 +53,7 @@ class QuizOut(BaseModel):
     answer: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 @router.get("/lessons/{lesson_id}/quizzes", response_model=List[QuizOut])
 def list_quizzes(lesson_id: uuid.UUID, db: Session = Depends(get_db)):
@@ -66,7 +66,7 @@ class ProgressOut(BaseModel):
     completed: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 @router.get("/progress/{user_id}", response_model=List[ProgressOut])
 def get_user_progress(user_id: uuid.UUID, db: Session = Depends(get_db)):
