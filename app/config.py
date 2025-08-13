@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str
     JWT_EXP_MINUTES: int
     
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your_super_secret_key_here")
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+    JWT_EXP_MINUTES: int = int(os.getenv("JWT_EXP_MINUTES", "30"))
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30

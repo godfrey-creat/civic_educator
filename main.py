@@ -6,7 +6,8 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import JWTError, jwt
+from jose  import JWTError, jwt
+from typing import List, Optional
 import logging
 from datetime import datetime
 import uuid
