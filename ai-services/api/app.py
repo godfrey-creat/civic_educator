@@ -95,7 +95,7 @@ async def server_error_exception_handler(request: Request, exc: Exception):
         content=ErrorResponse(
             error="Internal Server Error",
             code="internal_server_error",
-            details={"message": str(exc) if settings.debug else "An unexpected error occurred"}
+            details={"message": str(exc) if settings.DEBUG else "An unexpected error occurred"}
         ).dict(),
     )
 

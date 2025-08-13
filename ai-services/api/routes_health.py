@@ -35,7 +35,7 @@ def check_model_health(rag_pipeline: RAGPipeline) -> ServiceHealth:
     """Check the health of ML models."""
     try:
         # Test embedding model
-        test_embedding = rag_pipeline.embedding_model.embed_queries(["test"])[0]
+        test_embedding = rag_pipeline.embedding_model.embed_query("test")
         embedding_ok = len(test_embedding) > 0
         
         # Test reranker if available
@@ -145,11 +145,18 @@ async def health_check(
         
     except Exception as e:
         logger.error(f"Health check failed: {e}", exc_info=True)
+        error_detail = {"error": str(e)}
         return HealthCheckResponse(
             status=HealthStatus.UNHEALTHY,
             version=SERVICE_VERSION,
-            models={"error": "Health check failed"},
-            services={"error": "Health check failed"},
+            models={
+                "embedding": ServiceHealth(status=HealthStatus.UNHEALTHY, details=error_detail),
+                "reranker": ServiceHealth(status=HealthStatus.UNHEALTHY, details=error_detail),
+            },
+            services={
+                "system": ServiceHealth(status=HealthStatus.DEGRADED, details=error_detail),
+                "document_index": ServiceHealth(status=HealthStatus.DEGRADED, details=error_detail),
+            },
             timestamp=datetime.utcnow().isoformat()
         )
 

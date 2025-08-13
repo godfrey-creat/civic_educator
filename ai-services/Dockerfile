@@ -1,5 +1,5 @@
-# Use Python 3.8 slim as the base image
-FROM python:3.8-slim
+# Use Python 3.10 slim as the base image
+FROM python:3.10-slim
 
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -14,15 +14,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy wheels and requirements
-COPY wheels /wheels
+# Copy requirements first (so wheel caching works)
 COPY requirements.txt .
 
-# Install Python dependencies from wheels and requirements.txt
-RUN pip install --no-cache-dir /wheels/* && \
-    pip install --no-cache-dir -r requirements.txt
+# Pre-build wheels inside the container for Python 3.10
+RUN pip install --upgrade pip && \
+    mkdir -p /wheels && \
+    pip wheel --wheel-dir=/wheels -r requirements.txt
 
-# Copy application code
+# Install dependencies from wheels
+RUN pip install --no-cache-dir /wheels/*
+
+# Copy rest of the application code
 COPY . .
 
 # Ensure required directories exist

@@ -98,6 +98,14 @@ class Settings(BaseSettings):
         BASE_DIR / "data/index",
         description="Directory for storing vector indices"
     )
+    KNOWLEDGE_BASE_DIR: Path = Field(
+        BASE_DIR / "knowledge_base/sourced_pdfs",
+        description="Directory containing source PDFs for the knowledge base"
+    )
+    ANSWERS_DIR: Path = Field(
+        BASE_DIR / "knowledge_base/answers",
+        description="Directory to persist fetched/summarized answers"
+    )
     DOCUMENTS_DIR: Path = Field(
         BASE_DIR / "data/documents",
         description="Directory containing source documents"
@@ -127,6 +135,26 @@ class Settings(BaseSettings):
         None,
         env="OPENAI_API_KEY",
         description="OpenAI API key (if using OpenAI models)"
+    )
+    GOOGLE_API_KEY: Optional[str] = Field(
+        None,
+        env="GOOGLE_API_KEY",
+        description="Google Gemini API key (if using Gemini models)"
+    )
+    SERPAPI_KEY: Optional[str] = Field(
+        None,
+        env="SERPAPI_KEY",
+        description="SerpAPI key for live web search"
+    )
+    SEARCH_PROVIDER: str = Field(
+        "serpapi",
+        env="SEARCH_PROVIDER",
+        description="Web search provider to use (e.g., serpapi, bing, tavily)"
+    )
+    STALENESS_DAYS: int = Field(
+        90,
+        env="STALENESS_DAYS",
+        description="Days after which a cached answer is considered stale and should be refreshed"
     )
     
     class Config:
@@ -192,3 +220,5 @@ settings = Settings()
 settings.INDEX_DIR.mkdir(parents=True, exist_ok=True)
 settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
 settings.DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
+settings.KNOWLEDGE_BASE_DIR.mkdir(parents=True, exist_ok=True)
+settings.ANSWERS_DIR.mkdir(parents=True, exist_ok=True)

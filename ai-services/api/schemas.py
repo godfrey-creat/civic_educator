@@ -2,6 +2,7 @@
 Pydantic models for API request/response schemas.
 """
 from typing import List, Optional, Dict, Any
+from datetime import datetime
 from pydantic import BaseModel, Field
 from enum import Enum
 

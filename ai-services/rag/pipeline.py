@@ -11,12 +11,16 @@ import logging
 from typing import List, Dict, Any, Optional, Tuple, Union
 import json
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
 
 from models.embeddings import EmbeddingModel
 from models.reranker import Reranker
+from models.generation.gemini_client import GeminiClient
 from ingestion.index_builder import DocumentIndex
 from config import settings
+from utils.web_search import SerpAPIClient
+from utils.text import slugify, now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +64,7 @@ class RAGPipeline:
         reranker: Optional[Reranker] = None,
         confidence_threshold: float = 0.7,
         max_retrieved_docs: int = 5,
+        generator: Optional[GeminiClient] = None,
     ):
         """Initialize the RAG pipeline.
         
@@ -75,6 +80,8 @@ class RAGPipeline:
         self.reranker = reranker or Reranker()
         self.confidence_threshold = confidence_threshold
         self.max_retrieved_docs = max_retrieved_docs
+        self.generator = generator
+        self.search_client = SerpAPIClient(api_key=settings.SERPAPI_KEY)
         
         logger.info("RAG pipeline initialized with confidence threshold: %.2f", 
                    self.confidence_threshold)
@@ -96,11 +103,8 @@ class RAGPipeline:
             List of relevant documents with scores and metadata
         """
         try:
-            # Get query embedding
-            query_embedding = self.embedding_model.embed_queries([query])[0]
-            
-            # Search the index
-            results = self.index.search(query_embedding, top_k=top_k)
+            # Search the index directly with raw query; underlying index handles embedding
+            results = self.index.search(query, k=top_k)
             
             # Filter by score threshold
             relevant_docs = [
@@ -212,96 +216,105 @@ class RAGPipeline:
     
     async def query(
         self,
-        query: str,
-        context: Optional[Dict[str, Any]] = None,
+        question: str,
+        top_k: int = 3,
+        max_length: int = 500,
+        temperature: float = 0.7,
         **kwargs
-    ) -> RAGResponse:
-        """Process a user query and generate a response with citations.
+    ) -> Dict[str, Any]:
+        """
+        End-to-end query processing: retrieve and generate.
         
         Args:
-            query: User's question or input
-            context: Optional conversation context
-            **kwargs: Additional parameters for retrieval/generation
+            question: The user's question
+            top_k: Number of documents to retrieve
+            max_length: Maximum length of the generated response
+            temperature: Sampling temperature for generation
             
         Returns:
-            RAGResponse with answer, citations, and metadata
+            Dictionary containing the answer and supporting information
         """
-        try:
-            # 1. Retrieve relevant documents
-            documents = await self._get_relevant_documents(
-                query,
-                top_k=kwargs.get('top_k', self.max_retrieved_docs),
-                score_threshold=kwargs.get('score_threshold', 0.5)
-            )
-            
-            # 2. Generate response (placeholder - would use an LLM in production)
-            # In a real implementation, this would call an LLM with the documents as context
-            response_text = self._generate_response(query, documents, context)
-            
-            # 3. Calculate confidence
-            confidence = self._calculate_confidence(query, documents, response_text)
-            
-            # 4. Check if clarification is needed
-            needs_clarification, clarification_question = self._needs_clarification(
-                query, documents, confidence
-            )
-            
-            # 5. Format citations
-            citations = self._format_citations(documents)
-            
-            # 6. Update conversation context if provided
-            if context is not None:
-                context.update({
-                    "last_query": query,
-                    "last_documents": [doc["source"] for doc in documents],
-                    "last_confidence": confidence,
-                })
-            
-            return RAGResponse(
-                answer=response_text,
-                citations=citations,
-                confidence=confidence,
-                needs_clarification=needs_clarification,
-                clarification_question=clarification_question,
-                context=context or {}
-            )
-            
-        except Exception as e:
-            logger.error(f"Error in RAG pipeline: {e}")
-            return RAGResponse(
-                answer="I'm sorry, I encountered an error processing your request.",
-                citations=[],
-                confidence=0.0,
-                context=context or {}
-            )
-    
-    def _generate_response(
-        self,
-        query: str,
-        documents: List[Dict[str, Any]],
-        context: Optional[Dict[str, Any]] = None
-    ) -> str:
-        """Generate a response based on the query and documents.
+        # Retrieve relevant context
+        context = await self.retrieve(question, top_k=top_k)
         
-        In a real implementation, this would call an LLM with the documents as context.
-        This is a simplified version that just returns the top document's content.
-        """
-        if not documents:
-            return "I couldn't find any relevant information to answer your question."
-            
-        # In a real implementation, you would:
-        # 1. Format the documents into a prompt
-        # 2. Call an LLM with the prompt
-        # 3. Return the generated response
-        
-        # For now, just return the top document's content
-        top_doc = documents[0]
-        return (
-            f"Based on {top_doc.get('title', 'the document')}, "
-            f"here's what I found: {top_doc['content'][:500]}..."
-            "\n"
-#Note: This is a placeholder response. In a real implementation, this would be generated by an LLM."
+        # Generate grounded response
+        response = await self.generate_response(
+            query=question,
+            context=context,
+            max_length=max_length,
+            temperature=temperature
         )
+        
+        # Confidence gating and fallback
+        try:
+            confidence = self._calculate_confidence(question, context, response.get('answer', ''))
+        except Exception:
+            confidence = 0.0
+        
+        if (not context or confidence < self.confidence_threshold) and self.generator and self.generator.available():
+            # Attempt cached freshness check is implicit via RAG; proceed to live web search
+            web = None
+            try:
+                web = self.search_client.search(question) if self.search_client.available() else None
+            except Exception as e:
+                logger.warning("Web search failed: %s", e)
+
+            if web and web.get('link'):
+                # Summarize using Gemini if possible; otherwise use snippet
+                summary_prompt = (
+                    "You are a helpful civic information assistant. Based on the following search snippet, "
+                    "provide a concise, actionable answer for a Nairobi resident. If schedules vary by ward, say so and advise checking the link.\n\n"
+                    f"Snippet: {web.get('snippet','')}\n\n"
+                    "Respond in 1-3 sentences."
+                )
+                answer_text = self.generator.generate(summary_prompt)
+                if not answer_text.strip():
+                    answer_text = web.get('snippet') or "I'm sorry, I couldn't find a definitive answer right now."
+
+                # Persist to answers dir and index incrementally
+                try:
+                    date_fetched = now_iso()
+                    filename = slugify(question) + ".md"
+                    out_path = Path(settings.ANSWERS_DIR) / filename
+                    md = (
+                        f"# {question}\n\n" 
+                        f"{answer_text}\n\n"
+                        f"Source: {web.get('link')}\n\n"
+                        f"Date fetched: {date_fetched}\n"
+                    )
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    out_path.write_text(md, encoding='utf-8')
+
+                    # Index immediately with metadata
+                    metadata = {
+                        'source': web.get('link'),
+                        'type': 'web_answer',
+                        'question': question,
+                        'date_fetched': date_fetched,
+                        'title': web.get('title', ''),
+                    }
+                    self.index.add_document_and_index(content=md, metadata=metadata)
+                    self.index.save(str(settings.INDEX_DIR))
+                except Exception as e:
+                    logger.warning("Failed to persist/index web answer: %s", e)
+
+                return {
+                    'answer': answer_text,
+                    'citations': [{'title': web.get('title',''), 'snippet': web.get('snippet',''), 'source_link': web.get('link')}],
+                    'context': [],
+                    'sources': ['web']
+                }
+            else:
+                # No web results; at least return LLM fallback
+                fallback_answer = self.generator.generate(question)
+                return {
+                    'answer': fallback_answer,
+                    'citations': [],
+                    'context': [],
+                    'sources': ['gemini']
+                }
+        
+        return response
     
     async def retrieve(
         self,
@@ -322,8 +335,8 @@ class RAGPipeline:
         Returns:
             List of relevant documents with scores and metadata
         """
-        # First-stage retrieval using vector similarity
-        results = self.index.search(query, top_k=top_k * 2)  # Get more results for reranking
+        # First-stage retrieval using vector similarity (get more for reranking)
+        results = self.index.search(query, k=top_k * 2)
         
         if not results:
             return []
@@ -369,22 +382,34 @@ class RAGPipeline:
         Returns:
             Dictionary containing the generated answer and citations
         """
-        # Format the prompt with context and query
-        prompt = self._format_prompt(query, context)
+        # Limit and clean context for synthesis
+        top_context = context[:3] if context else []
+        prompt = self._format_prompt(query, top_context)
         
         try:
-            # In a real implementation, this would call an LLM API or local model
-            # For now, we'll return a simple response
-            answer = self._generate_simple_response(query, context)
+            # Prefer LLM synthesis if available to keep responses concise
+            if self.generator and self.generator.available():
+                synthesis_prompt = (
+                    "You are a helpful civic information assistant for Nairobi.\n"
+                    "Based ONLY on the context, provide a concise, user-facing answer in 1-3 sentences.\n"
+                    "If the context does not contain a direct answer, say you don't know.\n\n"
+                    f"{prompt}\n\n"
+                    "Answer:"
+                )
+                answer = (self.generator.generate(synthesis_prompt) or "").strip()
+                if not answer:
+                    answer = self._generate_simple_response(query, top_context)
+            else:
+                answer = self._generate_simple_response(query, top_context)
             
-            # Extract citations from the context
-            citations = self._extract_citations(context)
+            # Clean, structured citations
+            citations = self._format_citations(top_context)
             
             return {
-                'answer': answer,
+                'answer': answer.strip(),
                 'citations': citations,
-                'context': [c['content'] for c in context],
-                'sources': list(set(c['source'] for c in context))
+                'context': [],  # hide raw chunks to avoid messy output
+                'sources': list({c.get('source', 'kb') for c in top_context})
             }
             
         except Exception as e:
@@ -419,61 +444,15 @@ class RAGPipeline:
         """Generate a simple response for demo purposes."""
         if not context:
             return "I couldn't find any relevant information to answer your question."
-            
-        # This is a placeholder - in a real implementation, you would use an LLM
-        return (
-            f"Based on the available information, here's what I found regarding your question about '{query}'. "
-            f"The relevant documents suggest the following: {context[0]['content'][:200]}... "
-            "Please check the citations for more detailed information."
-        )
+        
+        # Heuristic concise summary from the first chunk
+        txt = context[0].get('content', '').strip().replace('\n', ' ')
+        txt = ' '.join(txt.split())  # collapse whitespace
+        snippet = txt[:240].rstrip()
+        if len(txt) > 240:
+            snippet += '...'
+        return f"Here's a concise summary based on the knowledge base: {snippet}"
     
     def _extract_citations(self, context: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Extract citation information from context."""
-        citations = []
-        seen_sources = set()
-        
-        for doc in context:
-            source = doc.get('metadata', {}).get('source')
-            if not source or source in seen_sources:
-                continue
-                
-            citations.append({
-                'source': source,
-                'title': doc.get('metadata', {}).get('title', 'Document'),
-                'page': doc.get('metadata', {}).get('page')
-            })
-            seen_sources.add(source)
-            
-        return citations
-    
-    async def query(
-        self,
-        question: str,
-        top_k: int = 3,
-        max_length: int = 500,
-        temperature: float = 0.7
-    ) -> Dict[str, Any]:
-        """
-        End-to-end query processing: retrieve and generate.
-        
-        Args:
-            question: The user's question
-            top_k: Number of documents to retrieve
-            max_length: Maximum length of the generated response
-            temperature: Sampling temperature for generation
-            
-        Returns:
-            Dictionary containing the answer and supporting information
-        """
-        # Retrieve relevant context
-        context = await self.retrieve(question, top_k=top_k)
-        
-        # Generate response
-        response = await self.generate_response(
-            query=question,
-            context=context,
-            max_length=max_length,
-            temperature=temperature
-        )
-        
-        return response
+        """Deprecated: prefer _format_citations for structured citations."""
+        return self._format_citations(context)

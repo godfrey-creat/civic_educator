@@ -10,7 +10,8 @@ services:
       - "8000:8000"
     volumes:
       - ./knowledge_base:/app/knowledge_base
-      - ./indexes:/app/indexes
+      - ./data:/app/data
+      - ./hf-cache:/root/.cache/huggingface
       - ./wheels:/wheels  # Mount pre-downloaded wheels into container
       - .:/app
     environment:
@@ -19,3 +20,6 @@ services:
       - PORT=8000
       - DEBUG=true
       - EMBEDDING_MODEL=all-MiniLM-L6-v2
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - HF_HOME=/root/.cache/huggingface
+      - TRANSFORMERS_CACHE=/root/.cache/huggingface

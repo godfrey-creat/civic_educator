@@ -112,18 +112,51 @@ class DocumentIndex:
         # Add vectors to the index
         self.index.add(np.array(embeddings).astype('float32'))
         logger.info(f"Built index with {len(embeddings)} vectors")
+
+    def add_document_and_index(self, content: str, metadata: Dict[str, Any]) -> int:
+        """Add a document and immediately index its chunks without rebuilding everything.
+
+        Returns the new document id.
+        """
+        doc_id = len(self.documents)
+        self.documents.append(metadata)
+        # Chunk
+        chunks = self.chunker.chunk_document(content, metadata)
+        # Embed new chunks
+        texts = [c.text for c in chunks]
+        if not texts:
+            return doc_id
+        embeddings = self.embedding_model.embed_documents(texts)
+        # Init FAISS if necessary
+        if self.index is None:
+            dim = len(embeddings[0])
+            self.index = faiss.IndexFlatL2(dim)
+        # Append chunks, mappings, and vectors
+        start_idx = len(self.chunks)
+        self.chunks.extend(chunks)
+        self.chunk_to_doc.extend([doc_id] * len(chunks))
+        self.index.add(np.array(embeddings).astype('float32'))
+        logger.info(
+            "Incrementally added document %s with %d chunks (index size=%d)",
+            metadata.get('source', f'doc_{doc_id}'), len(chunks), len(self.chunks)
+        )
+        return doc_id
     
-    def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query: str, k: int = 5, **kwargs) -> List[Dict[str, Any]]:
         """
         Search the index for relevant chunks.
         
         Args:
             query: Search query
             k: Number of results to return
-            
+            top_k (optional via kwargs): Alias for k for backward compatibility
+        
         Returns:
             List of search results with scores and metadata
         """
+        # Backward compatibility: allow callers to pass top_k instead of k
+        if 'top_k' in kwargs and isinstance(kwargs['top_k'], int):
+            k = kwargs['top_k']
         if self.index is None or not self.chunks:
             return []
         
@@ -165,7 +198,15 @@ class DocumentIndex:
         with open(save_path / "metadata.json", 'w', encoding='utf-8') as f:
             json.dump({
                 'documents': self.documents,
-                'chunks': [chunk.to_dict() for chunk in self.chunks],
+                'chunks': [
+                    {
+                        'text': chunk.text,
+                        'metadata': chunk.metadata,
+                        'chunk_id': getattr(chunk, 'chunk_id', ''),
+                        # We do not persist embeddings to reduce size; they are recomputed on build
+                    }
+                    for chunk in self.chunks
+                ],
                 'chunk_to_doc': self.chunk_to_doc
             }, f, ensure_ascii=False, indent=2)
         

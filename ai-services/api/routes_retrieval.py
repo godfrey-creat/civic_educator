@@ -9,6 +9,8 @@ from rag.pipeline import RAGPipeline
 from models.embeddings import EmbeddingModel
 from models.reranker import Reranker
 from ingestion.index_builder import DocumentIndex
+from config import settings
+import os
 
 router = APIRouter()
 
@@ -32,10 +34,24 @@ def get_rag_pipeline() -> RAGPipeline:
         # Initialize components if not already done
         embedding_model = EmbeddingModel()
         reranker = Reranker()
-        document_index = DocumentIndex()
-        
-        # In a real app, you would load the index here
-        # document_index = DocumentIndex.load("path/to/index")
+        # Load or build index (shared logic)
+        try:
+            if (settings.INDEX_DIR / "index.faiss").exists():
+                document_index = DocumentIndex.load(str(settings.INDEX_DIR))
+            else:
+                document_index = DocumentIndex(index_path=str(settings.INDEX_DIR))
+                from ingestion.document_loader import DocumentLoader
+                loader = DocumentLoader()
+                for root, _, files in os.walk(settings.KNOWLEDGE_BASE_DIR):
+                    for fname in files:
+                        if fname.lower().endswith((".pdf", ".txt", ".md", ".docx")):
+                            fpath = os.path.join(root, fname)
+                            doc = loader.load_document(fpath)
+                            document_index.add_document(doc["content"], doc["metadata"])
+                document_index.build_index()
+                document_index.save(str(settings.INDEX_DIR))
+        except Exception:
+            document_index = DocumentIndex()
         
         router.rag_pipeline = RAGPipeline(
             index=document_index,
@@ -80,6 +96,29 @@ async def search_documents(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error searching documents: {str(e)}"
         )
+
+@router.post("/reindex")
+async def reindex_kb(rag_pipeline: RAGPipeline = Depends(get_rag_pipeline)):
+    """Rebuild the vector index from the knowledge base directory."""
+    try:
+        from ingestion.document_loader import DocumentLoader
+        loader = DocumentLoader()
+        new_index = DocumentIndex(index_path=str(settings.INDEX_DIR))
+        indexed_docs = 0
+        for root, _, files in os.walk(settings.KNOWLEDGE_BASE_DIR):
+            for fname in files:
+                if fname.lower().endswith((".pdf", ".txt", ".md", ".docx")):
+                    fpath = os.path.join(root, fname)
+                    doc = loader.load_document(fpath)
+                    new_index.add_document(doc["content"], doc["metadata"])
+                    indexed_docs += 1
+        new_index.build_index()
+        new_index.save(str(settings.INDEX_DIR))
+        # Hot-swap into pipeline
+        rag_pipeline.index = new_index
+        return {"indexed_docs": indexed_docs, "indexed_chunks": len(new_index.chunks)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reindexing KB: {e}")
 
 @router.get("/documents/{doc_id}")
 async def get_document(

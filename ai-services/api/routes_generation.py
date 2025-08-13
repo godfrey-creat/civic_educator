@@ -4,11 +4,14 @@ API routes for text generation and question answering.
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
 from pydantic import BaseModel
+import os
 
 from rag.pipeline import RAGPipeline
 from models.embeddings import EmbeddingModel
 from models.reranker import Reranker
 from ingestion.index_builder import DocumentIndex
+from models.generation.gemini_client import GeminiClient
+from config import settings
 
 router = APIRouter()
 
@@ -22,8 +25,9 @@ class QuestionRequest(BaseModel):
 
 class Citation(BaseModel):
     """Citation model for sources."""
-    source: str
     title: Optional[str] = None
+    snippet: Optional[str] = None
+    source_link: Optional[str] = None
     page: Optional[int] = None
 
 class AnswerResponse(BaseModel):
@@ -31,7 +35,6 @@ class AnswerResponse(BaseModel):
     answer: str
     citations: List[Citation]
     sources: List[str]
-    context: List[str]
 
 # Dependencies
 def get_rag_pipeline() -> RAGPipeline:
@@ -40,15 +43,37 @@ def get_rag_pipeline() -> RAGPipeline:
         # Initialize components if not already done
         embedding_model = EmbeddingModel()
         reranker = Reranker()
-        document_index = DocumentIndex()
+        # Load or build index
+        try:
+            if (settings.INDEX_DIR / "index.faiss").exists():
+                document_index = DocumentIndex.load(str(settings.INDEX_DIR))
+            else:
+                document_index = DocumentIndex(index_path=str(settings.INDEX_DIR))
+                # Ingest PDFs from KB
+                from ingestion.document_loader import DocumentLoader
+                loader = DocumentLoader()
+                # Walk the KB directory for files
+                for root, _, files in os.walk(settings.KNOWLEDGE_BASE_DIR):
+                    for fname in files:
+                        if fname.lower().endswith((".pdf", ".txt", ".md", ".docx")):
+                            fpath = os.path.join(root, fname)
+                            doc = loader.load_document(fpath)
+                            document_index.add_document(doc["content"], doc["metadata"])
+                document_index.build_index()
+                document_index.save(str(settings.INDEX_DIR))
+        except Exception as e:
+            # Fallback to empty index if load/build fails
+            document_index = DocumentIndex()
         
-        # In a real app, you would load the index here
-        # document_index = DocumentIndex.load("path/to/index")
+        generator = GeminiClient(api_key=settings.GOOGLE_API_KEY)
         
         router.rag_pipeline = RAGPipeline(
             index=document_index,
             embedding_model=embedding_model,
-            reranker=reranker
+            reranker=reranker,
+            confidence_threshold=settings.CONFIDENCE_THRESHOLD,
+            max_retrieved_docs=settings.MAX_RETRIEVED_DOCS,
+            generator=generator
         )
     return router.rag_pipeline
 
@@ -75,21 +100,13 @@ async def ask_question(
             temperature=request.temperature
         )
         
-        # Format citations
-        citations = [
-            Citation(
-                source=cit["source"],
-                title=cit.get("title"),
-                page=cit.get("page")
-            )
-            for cit in result["citations"]
-        ]
+        # Format citations (title, snippet, source_link, page)
+        citations = [Citation(**{k: v for k, v in cit.items() if k in {"title", "snippet", "source_link", "page"}}) for cit in result.get("citations", [])]
         
         return {
-            "answer": result["answer"],
+            "answer": result.get("answer", ""),
             "citations": citations,
-            "sources": result["sources"],
-            "context": result["context"]
+            "sources": result.get("sources", []),
         }
         
     except Exception as e:
