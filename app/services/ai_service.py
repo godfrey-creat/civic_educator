@@ -8,10 +8,18 @@ class AIService:
         # Dummy async method for compatibility
         pass
 
+    async def cleanup(self):
+        # Dummy cleanup method for compatibility
+        # Close connections or free resources here if needed
+        pass
+
     @staticmethod
     def chat(messages, model="gpt-3.5-turbo", max_tokens=500, temperature=0.7):
         # Dummy implementation: echo the last user message
-        last_user_message = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+        last_user_message = next(
+            (m["content"] for m in reversed(messages) if m["role"] == "user"),
+            ""
+        )
         return {
             "response": f"Echo: {last_user_message}",
             "model": model,
