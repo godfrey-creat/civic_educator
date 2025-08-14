@@ -5,8 +5,6 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose  import JWTError, jwt
-from typing import List, Optional
 import logging
 from datetime import datetime
 from typing import Optional, List
@@ -64,7 +62,7 @@ app.include_router(staff_kb)
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=["*", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -75,27 +73,24 @@ app.add_middleware(
 # ----------------------------
 security = HTTPBearer(auto_error=False)
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Simple authentication - extend for production"""
+def get_current_staff_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
     if not credentials:
-        return None
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     
-    # For demo purposes, accept any token
-    # In production, validate JWT tokens properly
-    token = credentials.credentials
-    if token.startswith("staff_"):
-        return {"user_id": token, "role": "staff"}
-    elif token.startswith("resident_"):
-        return {"user_id": token, "role": "resident"}
-    return None
+    payload = decode_access_token(credentials.credentials)
+    user_id = payload.get("sub")
+    is_staff = payload.get("is_staff")
 
-def require_staff(user=Depends(get_current_user)):
-    """Require staff authentication"""
-    if not user or user.get("role") != "staff":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Staff access required"
-        )
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not is_staff:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Staff access required")
+    
     return user
 
 # ----------------------------
@@ -181,5 +176,7 @@ async def update_incident(
 def root():
     return {"message": "Civic Educator API is running"}
 
+port = int(os.environ.get("PORT", 8000))
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+
