@@ -134,11 +134,15 @@ async def generate_text(
         Generated text
     """
     try:
-        # In a real implementation, you would call an LLM here
-        # For now, we'll return a simple response
-        return {
-            "generated_text": f"This is a placeholder response to the prompt: {prompt}"
-        }
+        generator = getattr(rag_pipeline, "generator", None)
+        if generator and generator.available():
+            text = generator.generate(prompt)
+        else:
+            text = (
+                "LLM not configured. Set GOOGLE_API_KEY and ensure google-generativeai is installed. "
+                f"Echo: {prompt}"
+            )
+        return {"generated_text": text}
         
     except Exception as e:
         raise HTTPException(
